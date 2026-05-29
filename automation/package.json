@@ -1,0 +1,25 @@
+{
+  "name": "kyber-seo-automation",
+  "version": "1.0.0",
+  "description": "SEO content automation service — replaces n8n workflow",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc --outDir dist",
+    "start:prod": "node dist/index.js",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "dotenv": "^16.4.5",
+    "googleapis": "^144.0.0",
+    "node-cron": "^3.0.3",
+    "winston": "^3.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3"
+  }
+}

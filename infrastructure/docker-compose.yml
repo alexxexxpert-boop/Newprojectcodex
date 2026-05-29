@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  nextjs:
+    build:
+      context: ../nextjs
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - WP_API_URL=${WP_API_URL}
+      - WP_API_HOSTNAME=${WP_API_HOSTNAME}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+      - NEXT_PUBLIC_SITE_NAME=${NEXT_PUBLIC_SITE_NAME:-Кибер СЕО}
+      - REVALIDATE_SECRET=${NEXTJS_REVALIDATE_SECRET}
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  automation:
+    build:
+      context: ../automation
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - WP_API_URL=${WP_API_URL}
+      - WP_USERNAME=${WP_USERNAME}
+      - WP_APP_PASSWORD=${WP_APP_PASSWORD}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+      - NEXTJS_REVALIDATE_SECRET=${NEXTJS_REVALIDATE_SECRET}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY:-}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN:-}
+      - SEMRUSH_API_KEY=${SEMRUSH_API_KEY:-}
+      - GOOGLE_SHEETS_ID=${GOOGLE_SHEETS_ID}
+      - GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL}
+      - GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY=${GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY}
+      - PUBLISH_STATUS=${PUBLISH_STATUS:-draft}
+      - POLL_INTERVAL_MINUTES=${POLL_INTERVAL_MINUTES:-5}
+    volumes:
+      - automation_logs:/app/logs
+    depends_on:
+      - nextjs
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - nginx_cache:/var/cache/nginx
+    depends_on:
+      - nextjs
+
+volumes:
+  automation_logs:
+  nginx_cache:
