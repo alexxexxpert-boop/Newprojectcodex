@@ -1,7 +1,8 @@
-import { callClaude, parseJsonFromClaude } from "../utils/claude.js";
+import { callLLM, parseJsonFromLLM } from "../utils/llm.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 import { sleep } from "../utils/retry.js";
+import { mockImagePrompts } from "../mocks/index.js";
 
 export interface ImagePrompt {
   h2: string;
@@ -24,6 +25,11 @@ export async function generateImagePrompts(
   keyword: string,
   h2Titles: string[]
 ): Promise<ImagePrompt[]> {
+  if (config.dryRun) {
+    logger.info("[DRY RUN] Returning mock image prompts", { keyword });
+    return mockImagePrompts(h2Titles);
+  }
+
   const userPrompt = `Создай промпты для изображений для каждого H2 раздела статьи о "${keyword}".
 
 H2 РАЗДЕЛЫ:
@@ -54,11 +60,11 @@ ${h2Titles.map((t, i) => `${i + 1}. ${t}`).join("\n")}
   logger.info("Generating image prompts", { keyword, count: h2Titles.length });
 
   try {
-    const raw = await callClaude(PROMPT_SYSTEM, userPrompt, {
+    const raw = await callLLM(PROMPT_SYSTEM, userPrompt, {
       temperature: 0.7,
       maxTokens: 3000,
     });
-    return parseJsonFromClaude<ImagePrompt[]>(raw);
+    return parseJsonFromLLM<ImagePrompt[]>(raw);
   } catch (err) {
     logger.warn("Image prompt generation failed, using empty prompts", {
       error: err instanceof Error ? err.message : String(err),

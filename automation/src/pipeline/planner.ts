@@ -1,5 +1,7 @@
-import { callClaude, parseJsonFromClaude } from "../utils/claude.js";
+import { callLLM, parseJsonFromLLM } from "../utils/llm.js";
 import { logger } from "../utils/logger.js";
+import { config } from "../config.js";
+import { mockOutline } from "../mocks/index.js";
 import type { RelatedKeyword } from "./keywords.js";
 
 export interface Subsection {
@@ -41,6 +43,11 @@ export async function planTopic(
   keyword: string,
   relatedKeywords: RelatedKeyword[]
 ): Promise<ArticleOutline> {
+  if (config.dryRun) {
+    logger.info("[DRY RUN] Returning mock outline", { keyword });
+    return mockOutline(keyword);
+  }
+
   const relatedList = relatedKeywords.map((k) => k.keyword).join(", ") || "нет";
 
   const userPrompt = `Создай детальную структуру статьи для ключевого слова: "${keyword}"
@@ -85,12 +92,12 @@ export async function planTopic(
 }`;
 
   logger.info("Planning article outline", { keyword });
-  const raw = await callClaude(SYSTEM_PROMPT, userPrompt, {
+  const raw = await callLLM(SYSTEM_PROMPT, userPrompt, {
     temperature: 0.4,
     maxTokens: 4096,
   });
 
-  const outline = parseJsonFromClaude<ArticleOutline>(raw);
+  const outline = parseJsonFromLLM<ArticleOutline>(raw);
   logger.info("Article outline ready", {
     keyword,
     sections: outline.sections.length,

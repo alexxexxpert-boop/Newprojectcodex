@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 import { withRetry } from "../utils/retry.js";
+import { mockKeywordData } from "../mocks/index.js";
 
 export interface KeywordData {
   seedKeyword: string;
@@ -16,6 +17,11 @@ export interface RelatedKeyword {
 }
 
 export async function researchKeywords(keyword: string): Promise<KeywordData> {
+  if (config.dryRun) {
+    logger.info("[DRY RUN] Returning mock keyword data", { keyword });
+    return mockKeywordData(keyword);
+  }
+
   if (!config.semrush.enabled) {
     logger.info("Semrush API not configured, using seed keyword only", { keyword });
     return { seedKeyword: keyword, searchVolume: 0, difficulty: 0, relatedKeywords: [] };

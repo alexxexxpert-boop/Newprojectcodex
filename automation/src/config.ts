@@ -1,13 +1,55 @@
 import "dotenv/config";
 
+// In dry-run mode the pipeline uses mock data, so real credentials are not
+// required — missing keys fall back to harmless placeholders.
+const DRY_RUN = process.env.DRY_RUN === "true";
+
 function required(key: string): string {
   const value = process.env[key];
-  if (!value) throw new Error(`Missing required environment variable: ${key}`);
+  if (!value) {
+    if (DRY_RUN) return `dry-run-${key}`;
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
   return value;
 }
 
 function optional(key: string, fallback = ""): string {
   return process.env[key] ?? fallback;
+}
+
+export type LlmProvider = "anthropic" | "openrouter";
+
+export interface LlmConfig {
+  provider: LlmProvider;
+  apiKey: string;
+  model: string;
+  // OpenRouter optional attribution headers
+  referer: string;
+  title: string;
+}
+
+function buildLlmConfig(): LlmConfig {
+  const provider = (optional("LLM_PROVIDER", "anthropic") as LlmProvider);
+
+  if (provider === "openrouter") {
+    return {
+      provider,
+      apiKey: required("OPENROUTER_API_KEY"),
+      // Any OpenRouter model slug, e.g. anthropic/claude-3.5-sonnet,
+      // openai/gpt-4o, google/gemini-pro-1.5, deepseek/deepseek-chat
+      model: optional("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet"),
+      referer: optional("OPENROUTER_REFERER", "https://example.com"),
+      title: optional("OPENROUTER_TITLE", "Kyber SEO Automation"),
+    };
+  }
+
+  return {
+    provider: "anthropic",
+    apiKey: required("ANTHROPIC_API_KEY"),
+    model: optional("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+    referer: "",
+    title: "",
+  };
 }
 
 export const config = {
@@ -20,10 +62,7 @@ export const config = {
     siteUrl: required("NEXT_PUBLIC_SITE_URL"),
     revalidateSecret: optional("NEXTJS_REVALIDATE_SECRET"),
   },
-  anthropic: {
-    apiKey: required("ANTHROPIC_API_KEY"),
-    model: "claude-sonnet-4-6",
-  },
+  llm: buildLlmConfig(),
   perplexity: {
     apiKey: optional("PERPLEXITY_API_KEY"),
     enabled: !!process.env["PERPLEXITY_API_KEY"],
@@ -53,4 +92,5 @@ export const config = {
     publishStatus: (optional("PUBLISH_STATUS", "draft") as "publish" | "draft"),
     pollIntervalMinutes: parseInt(optional("POLL_INTERVAL_MINUTES", "5"), 10),
   },
+  dryRun: DRY_RUN,
 };

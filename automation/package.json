@@ -5,6 +5,7 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "tsx src/index.ts",
+    "dry-run": "tsx src/dry-run.ts",
     "build": "tsc --outDir dist",
     "start:prod": "node dist/index.js",
     "dev": "tsx watch src/index.ts"

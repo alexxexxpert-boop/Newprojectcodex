@@ -23,6 +23,9 @@ nextjs/dist/
 *.log
 logs/
 
+# Dry-run output
+automation/output/
+
 # OS
 .DS_Store
 Thumbs.db

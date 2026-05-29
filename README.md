@@ -109,6 +109,28 @@ npm install
 npm start
 ```
 
+### 🧪 Dry-run (прогон всей цепочки без ключей)
+
+Прогоняет весь пайплайн на моках — без реальных API, WordPress и Google Sheets.
+На выходе готовый HTML в `automation/output/<slug>.html`:
+
+```bash
+cd automation
+npm install
+npm run dry-run -- "как продвигать сайт в Яндексе"
+```
+
+### LLM-провайдер: Anthropic или OpenRouter
+
+По умолчанию используется Anthropic. Чтобы переключиться на **OpenRouter**
+(один ключ → Claude, GPT-4o, Gemini, DeepSeek и др.):
+
+```bash
+LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet   # любой слаг с openrouter.ai/models
+```
+
 ### Логи
 
 ```bash

@@ -1,5 +1,7 @@
-import { callClaude, parseJsonFromClaude } from "../utils/claude.js";
+import { callLLM, parseJsonFromLLM } from "../utils/llm.js";
 import { logger } from "../utils/logger.js";
+import { config } from "../config.js";
+import { mockAudit } from "../mocks/index.js";
 
 export interface AuditResult {
   score: number; // 0–100
@@ -14,6 +16,11 @@ export async function auditContent(
   keyword: string,
   fullArticle: string
 ): Promise<AuditResult> {
+  if (config.dryRun) {
+    logger.info("[DRY RUN] Returning mock audit", { keyword });
+    return mockAudit();
+  }
+
   const wordCount = fullArticle.split(/\s+/).length;
 
   const userPrompt = `Проведи SEO-аудит статьи по ключевому слову: "${keyword}"
@@ -45,11 +52,11 @@ approved: true если score >= 65.`;
   logger.info("Auditing article content", { keyword, wordCount });
 
   try {
-    const raw = await callClaude(AUDITOR_SYSTEM, userPrompt, {
+    const raw = await callLLM(AUDITOR_SYSTEM, userPrompt, {
       temperature: 0.2,
       maxTokens: 1024,
     });
-    const result = parseJsonFromClaude<AuditResult>(raw);
+    const result = parseJsonFromLLM<AuditResult>(raw);
 
     if (result.score < 65) {
       logger.warn("Article scored below threshold, publishing anyway", {

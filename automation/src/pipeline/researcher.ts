@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 import { withRetry } from "../utils/retry.js";
+import { mockResearch } from "../mocks/index.js";
 import type { Section } from "./planner.js";
 
 export interface SectionResearch {
@@ -13,6 +14,14 @@ export async function researchSections(
   sections: Section[]
 ): Promise<Map<string, SectionResearch>> {
   const results = new Map<string, SectionResearch>();
+
+  if (config.dryRun) {
+    logger.info("[DRY RUN] Returning mock research", { keyword });
+    for (const section of sections) {
+      results.set(section.h2, mockResearch(section.h2));
+    }
+    return results;
+  }
 
   if (!config.perplexity.enabled) {
     logger.info("Perplexity API not configured, skipping research phase", { keyword });

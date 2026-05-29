@@ -1,5 +1,7 @@
-import { callClaude } from "../utils/claude.js";
+import { callLLM } from "../utils/llm.js";
 import { logger } from "../utils/logger.js";
+import { config } from "../config.js";
+import { mockSectionContent } from "../mocks/index.js";
 import type { ArticleOutline, Section } from "./planner.js";
 import type { SectionResearch } from "./researcher.js";
 
@@ -41,6 +43,10 @@ async function writeSingleSection(
   section: Section,
   research: SectionResearch | undefined
 ): Promise<string> {
+  if (config.dryRun) {
+    return mockSectionContent(section.h2);
+  }
+
   const subsectionsList = section.subsections
     .map((s) => `  - ### ${s.h3}: ${s.description}`)
     .join("\n");
@@ -79,7 +85,7 @@ ${section.hasTable ? "- Включи таблицу сравнения" : ""}
 
 Верни ТОЛЬКО текст раздела в Markdown, без H2 заголовка (он добавится автоматически).`;
 
-  return callClaude(WRITER_SYSTEM, userPrompt, {
+  return callLLM(WRITER_SYSTEM, userPrompt, {
     temperature: 0.6,
     maxTokens: 2048,
   });
