@@ -11,8 +11,13 @@ interface Params {
 }
 
 export async function generateStaticParams() {
-  const categories = await getCategories();
-  return categories.map((cat) => ({ slug: cat.slug }));
+  try {
+    const categories = await getCategories();
+    return categories.map((cat) => ({ slug: cat.slug }));
+  } catch {
+    // WordPress unreachable at build time — pages generate on-demand via ISR
+    return [];
+  }
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {

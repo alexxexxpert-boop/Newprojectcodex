@@ -6,8 +6,8 @@ export async function GET() {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://example.com";
 
   const [posts, categories] = await Promise.all([
-    getPosts({ per_page: 100, _fields: "slug,modified" }),
-    getCategories(),
+    getPosts({ per_page: 100, _fields: "slug,modified" }).catch(() => []),
+    getCategories().catch(() => []),
   ]);
 
   const staticUrls = [

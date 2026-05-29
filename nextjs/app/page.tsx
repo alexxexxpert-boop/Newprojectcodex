@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 
 export default async function HomePage() {
   const [posts, categories] = await Promise.all([
-    getPosts({ per_page: 12 }),
-    getCategories(),
+    getPosts({ per_page: 12 }).catch(() => []),
+    getCategories().catch(() => []),
   ]);
 
   return (
