@@ -1,7 +1,7 @@
 import { callLLM, parseJsonFromLLM } from "../utils/llm.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
-import { sleep } from "../utils/retry.js";
+import { withRetry } from "../utils/retry.js";
 import { mockImagePrompts } from "../mocks/index.js";
 
 export interface ImagePrompt {
@@ -17,6 +17,23 @@ export interface GeneratedImage {
   altText: string;
   caption: string;
 }
+
+// ─── Fal.ai response shape ────────────────────────────────────────────────────
+
+interface FalImage {
+  url: string;
+  width: number;
+  height: number;
+  content_type: string;
+}
+
+interface FalResponse {
+  images: FalImage[];
+  seed?: number;
+  prompt?: string;
+}
+
+// ─── Prompt generation ────────────────────────────────────────────────────────
 
 const PROMPT_SYSTEM = `Ты специалист по созданию промптов для text-to-image моделей (Flux).
 Отвечай ТОЛЬКО валидным JSON без комментариев.`;
@@ -66,23 +83,25 @@ ${h2Titles.map((t, i) => `${i + 1}. ${t}`).join("\n")}
     });
     return parseJsonFromLLM<ImagePrompt[]>(raw);
   } catch (err) {
-    logger.warn("Image prompt generation failed, using empty prompts", {
+    logger.warn("Image prompt generation failed, using fallback prompts", {
       error: err instanceof Error ? err.message : String(err),
     });
     return h2Titles.map((h2) => ({
       h2,
-      fluxPrompt: "",
+      fluxPrompt: `Professional clean illustration representing: ${h2}, soft lighting, no text, no faces`,
       altText: h2,
       caption: h2,
     }));
   }
 }
 
+// ─── Image generation via Fal.ai ──────────────────────────────────────────────
+
 export async function generateImages(
   prompts: ImagePrompt[]
 ): Promise<GeneratedImage[]> {
-  if (!config.replicate.enabled) {
-    logger.info("Replicate not configured, using placeholder images");
+  if (!config.falAi.enabled) {
+    logger.info("Fal.ai not configured (FAL_AI_KEY missing), skipping image generation");
     return prompts.map((p) => ({
       h2: p.h2,
       imageUrl: "",
@@ -94,17 +113,12 @@ export async function generateImages(
   const results: GeneratedImage[] = [];
 
   for (const prompt of prompts) {
-    if (!prompt.fluxPrompt) {
-      results.push({ h2: prompt.h2, imageUrl: "", altText: prompt.altText, caption: prompt.caption });
-      continue;
-    }
-
     try {
-      const imageUrl = await runFluxPrediction(prompt.fluxPrompt);
+      const imageUrl = await withRetry(() => callFalAi(prompt.fluxPrompt), 3, 2000);
       results.push({ h2: prompt.h2, imageUrl, altText: prompt.altText, caption: prompt.caption });
-      logger.info("Image generated", { h2: prompt.h2 });
+      logger.info("Image generated via Fal.ai", { h2: prompt.h2 });
     } catch (err) {
-      logger.warn("Image generation failed for section", {
+      logger.warn("Fal.ai image generation failed for section, skipping", {
         h2: prompt.h2,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -115,44 +129,32 @@ export async function generateImages(
   return results;
 }
 
-async function runFluxPrediction(prompt: string): Promise<string> {
-  const createRes = await fetch("https://api.replicate.com/v1/predictions", {
+async function callFalAi(prompt: string): Promise<string> {
+  // Fal.ai is synchronous for fast models — no polling needed.
+  const endpoint = `https://fal.run/${config.falAi.model}`;
+
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
-      Authorization: `Token ${config.replicate.apiToken}`,
+      Authorization: `Key ${config.falAi.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      version: config.replicate.modelVersion,
-      input: { prompt, num_outputs: 1, aspect_ratio: "16:9" },
+      prompt,
+      image_size: config.falAi.imageSize,
+      num_inference_steps: 4, // flux-schnell optimal
+      num_images: 1,
+      enable_safety_checker: true,
     }),
   });
 
-  if (!createRes.ok) throw new Error(`Replicate create error: ${createRes.status}`);
-  const prediction = (await createRes.json()) as { id: string; urls: { get: string } };
-
-  // Poll for completion (max 90 seconds)
-  const deadline = Date.now() + 90_000;
-  while (Date.now() < deadline) {
-    await sleep(3000);
-    const pollRes = await fetch(prediction.urls.get, {
-      headers: { Authorization: `Token ${config.replicate.apiToken}` },
-    });
-    if (!pollRes.ok) throw new Error(`Replicate poll error: ${pollRes.status}`);
-
-    const status = (await pollRes.json()) as {
-      status: string;
-      output?: string[];
-      error?: string;
-    };
-
-    if (status.status === "succeeded" && status.output?.[0]) {
-      return status.output[0];
-    }
-    if (status.status === "failed") {
-      throw new Error(`Replicate prediction failed: ${status.error ?? "unknown"}`);
-    }
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Fal.ai error ${response.status}: ${body}`);
   }
 
-  throw new Error("Replicate prediction timed out after 90 seconds");
+  const data = (await response.json()) as FalResponse;
+  const url = data.images?.[0]?.url;
+  if (!url) throw new Error("Fal.ai returned no image URL");
+  return url;
 }

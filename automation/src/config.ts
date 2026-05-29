@@ -67,12 +67,12 @@ export const config = {
     apiKey: optional("PERPLEXITY_API_KEY"),
     enabled: !!process.env["PERPLEXITY_API_KEY"],
   },
-  replicate: {
-    apiToken: optional("REPLICATE_API_TOKEN"),
-    enabled: !!process.env["REPLICATE_API_TOKEN"],
-    // flux-schnell model version
-    modelVersion:
-      "5f24084160c9089501c1b3545d9be3c27883ae2239b6f412990e82d4a6210f8f",
+  falAi: {
+    apiKey: optional("FAL_AI_KEY"),
+    enabled: !!process.env["FAL_AI_KEY"],
+    // fal-ai/flux/schnell — синхронный эндпоинт, ~2-4с на картинку
+    model: optional("FAL_AI_MODEL", "fal-ai/flux/schnell"),
+    imageSize: optional("FAL_AI_IMAGE_SIZE", "landscape_16_9"),
   },
   semrush: {
     apiKey: optional("SEMRUSH_API_KEY"),

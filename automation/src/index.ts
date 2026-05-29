@@ -7,7 +7,7 @@ logger.info("Кибер СЕО & GEO Automation Service starting...", {
   pollInterval: config.automation.pollIntervalMinutes,
   perplexityEnabled: config.perplexity.enabled,
   semrushEnabled: config.semrush.enabled,
-  replicateEnabled: config.replicate.enabled,
+  falAiEnabled: config.falAi.enabled,
 });
 
 startScheduler();
