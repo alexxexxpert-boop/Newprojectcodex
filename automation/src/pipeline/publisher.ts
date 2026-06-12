@@ -19,7 +19,13 @@ interface WpPostResponse {
 }
 
 interface WpMediaResponse {
+  id: number;
   source_url: string;
+}
+
+export interface UploadedImages {
+  images: GeneratedImage[];
+  featuredMediaId: number | null;
 }
 
 function wpAuthHeader(): string {
@@ -32,10 +38,11 @@ function wpAuthHeader(): string {
 export async function uploadImagesToWordPress(
   images: GeneratedImage[],
   articleSlug: string
-): Promise<GeneratedImage[]> {
-  if (config.dryRun) return images;
+): Promise<UploadedImages> {
+  if (config.dryRun) return { images, featuredMediaId: null };
 
   const result: GeneratedImage[] = [];
+  let featuredMediaId: number | null = null;
   let idx = 0;
 
   for (const img of images) {
@@ -45,17 +52,19 @@ export async function uploadImagesToWordPress(
     }
     idx++;
     try {
-      const wpUrl = await withRetry(() =>
+      const { url, id } = await withRetry(() =>
         uploadSingleImage(
           img.imageUrl,
           `${articleSlug}-${idx}.jpg`,
           img.altText,
-          img.altText,   // title = altText (краткое SEO-название)
+          img.altText,
           img.caption
         )
       );
-      result.push({ ...img, imageUrl: wpUrl });
-      logger.info("Image uploaded to WP media library", { h2: img.h2, wpUrl });
+      // First uploaded image becomes the featured image (post thumbnail)
+      if (featuredMediaId === null) featuredMediaId = id;
+      result.push({ ...img, imageUrl: url });
+      logger.info("Image uploaded to WP media library", { h2: img.h2, url });
     } catch (err) {
       logger.warn("Failed to upload image to WordPress, omitting image", {
         h2: img.h2,
@@ -65,7 +74,7 @@ export async function uploadImagesToWordPress(
     }
   }
 
-  return result;
+  return { images: result, featuredMediaId };
 }
 
 async function uploadSingleImage(
@@ -74,7 +83,7 @@ async function uploadSingleImage(
   altText: string,
   title: string,
   caption: string
-): Promise<string> {
+): Promise<{ url: string; id: number }> {
   const downloadRes = await fetch(externalUrl);
   if (!downloadRes.ok) {
     throw new Error(`Failed to download image: ${downloadRes.status}`);
@@ -98,7 +107,7 @@ async function uploadSingleImage(
     throw new Error(`WP media upload error ${uploadRes.status}: ${body}`);
   }
 
-  const data = (await uploadRes.json()) as WpMediaResponse & { id: number };
+  const data = (await uploadRes.json()) as WpMediaResponse;
 
   // Set SEO metadata in the media library
   await fetch(`${config.wordpress.apiUrl}/media/${data.id}`, {
@@ -107,29 +116,26 @@ async function uploadSingleImage(
       Authorization: wpAuthHeader(),
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      alt_text: altText,
-      title: title,
-      caption: caption,
-    }),
+    body: JSON.stringify({ alt_text: altText, title, caption }),
   });
 
-  return data.source_url;
+  return { url: data.source_url, id: data.id };
 }
 
 export async function publishToWordPress(
-  article: CompiledArticle
+  article: CompiledArticle,
+  featuredMediaId?: number | null
 ): Promise<PublishResult> {
   if (config.dryRun) {
     return publishToDisk(article);
   }
 
-  logger.info("Publishing to WordPress", { slug: article.slug });
+  logger.info("Publishing to WordPress", { slug: article.slug, featuredMediaId });
 
   const categoryIds = await ensureCategories(article.categories);
   const tagIds = await ensureTags(article.tags);
 
-  const postBody = {
+  const postBody: Record<string, unknown> = {
     title: article.title,
     content: article.content,
     excerpt: article.excerpt,
@@ -142,6 +148,10 @@ export async function publishToWordPress(
       _yoast_wpseo_title: article.title,
     },
   };
+
+  if (featuredMediaId) {
+    postBody["featured_media"] = featuredMediaId;
+  }
 
   const result = await withRetry(async () => {
     const response = await fetch(`${config.wordpress.apiUrl}/posts`, {

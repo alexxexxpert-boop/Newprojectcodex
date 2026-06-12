@@ -39,7 +39,7 @@ export async function runPipeline(keyword: string): Promise<PipelineResult> {
   const rawImages = await generateImages(imagePrompts);
 
   // Step 6b: Upload images to WP media library (no external CDN links in articles)
-  const images = await uploadImagesToWordPress(rawImages, outline.slug);
+  const { images, featuredMediaId } = await uploadImagesToWordPress(rawImages, outline.slug);
 
   // Step 7: Compile full article
   const article = compileArticle(outline, writtenSections, images);
@@ -52,8 +52,8 @@ export async function runPipeline(keyword: string): Promise<PipelineResult> {
     approved: auditResult.approved,
   });
 
-  // Step 9: Publish to WordPress (even if audit score is low — logged as warning)
-  const publishResult = await publishToWordPress(article);
+  // Step 9: Publish to WordPress with featured image
+  const publishResult = await publishToWordPress(article, featuredMediaId);
 
   logger.info("Pipeline complete", {
     keyword,
