@@ -6,7 +6,6 @@ import { logger } from "../utils/logger.js";
 
 const BANNER_WIDTH = 1920;
 const BANNER_HEIGHT = 480;
-const PHOTOS_COUNT = 4;
 const USED_IDS_FILE = path.resolve(process.cwd(), "queue/banner-used.json");
 
 interface WpMedia {
@@ -41,46 +40,33 @@ async function fetchAllMediaPhotos(): Promise<WpMedia[]> {
   if (!res.ok) throw new Error(`Failed to fetch media: ${res.status}`);
   const all = (await res.json()) as WpMedia[];
 
+  // Only landscape/square photos with known dimensions
   return all.filter(
     (m) =>
-      m.media_details?.width >= 400 &&
-      m.media_details?.height >= 300 &&
+      m.media_details?.width >= 300 &&
+      m.media_details?.height >= 200 &&
       m.source_url
   );
 }
 
-// Pick PHOTOS_COUNT photos avoiding recently used ones.
-// Once all photos are exhausted the used list resets.
-async function pickPhotos(): Promise<WpMedia[]> {
+// Pick photos avoiding recently used ones, then mark them used
+async function pickPhotos(needed: number): Promise<WpMedia[]> {
   const all = await fetchAllMediaPhotos();
   if (all.length === 0) throw new Error("No suitable images in media library");
 
   const usedIds = await loadUsedIds();
-
-  // Prefer photos not recently used
   let available = all.filter((m) => !usedIds.includes(m.id));
 
-  // If not enough fresh photos, reset used list
-  if (available.length < PHOTOS_COUNT) {
+  if (available.length < needed) {
     logger.info("All media photos cycled — resetting rotation");
     await saveUsedIds([]);
     available = all;
   }
 
-  // Shuffle available pool and pick
   const shuffled = available.sort(() => Math.random() - 0.5);
-  const picked = shuffled.slice(0, PHOTOS_COUNT);
+  const picked = shuffled.slice(0, needed);
 
-  // Mark picked as used
-  const newUsedIds = [...usedIds, ...picked.map((m) => m.id)];
-  await saveUsedIds(newUsedIds);
-
-  logger.info("Photos picked for banner", {
-    picked: picked.length,
-    availableBefore: available.length,
-    totalInLibrary: all.length,
-  });
-
+  await saveUsedIds([...usedIds, ...picked.map((m) => m.id)]);
   return picked;
 }
 
@@ -90,30 +76,75 @@ async function downloadImage(url: string): Promise<Buffer> {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// Calculate how wide each photo would be at BANNER_HEIGHT (preserving aspect ratio)
+function naturalWidth(photo: WpMedia): number {
+  return Math.round((photo.media_details.width / photo.media_details.height) * BANNER_HEIGHT);
+}
+
 export async function createBannerFromMedia(): Promise<Buffer> {
-  const photos = await pickPhotos();
-  const sliceWidth = Math.floor(BANNER_WIDTH / photos.length);
+  const all = await fetchAllMediaPhotos();
+  if (all.length === 0) throw new Error("No suitable images in media library");
+
+  const usedIds = await loadUsedIds();
+  let available = all.filter((m) => !usedIds.includes(m.id));
+  if (available.length === 0) {
+    await saveUsedIds([]);
+    available = all;
+  }
+
+  // Shuffle pool
+  const pool = available.sort(() => Math.random() - 0.5);
+
+  // Pick photos until cumulative natural width covers BANNER_WIDTH
+  const selected: WpMedia[] = [];
+  let totalNaturalWidth = 0;
+
+  for (const photo of pool) {
+    selected.push(photo);
+    totalNaturalWidth += naturalWidth(photo);
+    if (totalNaturalWidth >= BANNER_WIDTH) break;
+  }
+
+  // Mark selected as used
+  await saveUsedIds([...usedIds, ...selected.map((m) => m.id)]);
+
+  // Scale factor so all photos together fill exactly BANNER_WIDTH
+  const scale = BANNER_WIDTH / totalNaturalWidth;
 
   logger.info("Creating banner collage", {
-    photoCount: photos.length,
+    photoCount: selected.length,
+    totalNaturalWidth,
+    scale: scale.toFixed(3),
     bannerSize: `${BANNER_WIDTH}x${BANNER_HEIGHT}`,
   });
 
+  // Calculate final widths (ensure they sum to exactly BANNER_WIDTH)
+  const finalWidths = selected.map((p, i) => {
+    if (i === selected.length - 1) {
+      // Last photo fills remaining pixels
+      const used = selected.slice(0, i).reduce((s, p2) => s + Math.round(naturalWidth(p2) * scale), 0);
+      return BANNER_WIDTH - used;
+    }
+    return Math.round(naturalWidth(p) * scale);
+  });
+
+  // Download and resize each photo proportionally (no crop — fit: "fill" scales to exact size)
   const slices = await Promise.all(
-    photos.map(async (photo, i) => {
+    selected.map(async (photo, i) => {
       const imgBuf = await downloadImage(photo.source_url);
-      const w = i === photos.length - 1 ? BANNER_WIDTH - sliceWidth * i : sliceWidth;
       return sharp(imgBuf)
-        .resize(w, BANNER_HEIGHT, { fit: "cover", position: "centre" })
+        .resize(finalWidths[i], BANNER_HEIGHT, { fit: "fill" }) // fill = scale to exact, no crop
         .toBuffer();
     })
   );
 
-  const compositeInput = slices.map((buf, i) => ({
-    input: buf,
-    left: i * sliceWidth,
-    top: 0,
-  }));
+  // Composite slices side by side
+  let xOffset = 0;
+  const compositeInput = slices.map((buf, i) => {
+    const input = { input: buf, left: xOffset, top: 0 };
+    xOffset += finalWidths[i]!;
+    return input;
+  });
 
   const banner = await sharp({
     create: {
@@ -124,9 +155,13 @@ export async function createBannerFromMedia(): Promise<Buffer> {
     },
   })
     .composite(compositeInput)
-    .jpeg({ quality: 85 })
+    .jpeg({ quality: 88 })
     .toBuffer();
 
-  logger.info("Banner collage created", { bytes: banner.length });
+  logger.info("Banner collage created", {
+    bytes: banner.length,
+    photos: selected.map((p) => p.id),
+  });
+
   return banner;
 }
