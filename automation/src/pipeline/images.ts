@@ -57,12 +57,14 @@ ${h2Titles.map((t, i) => `${i + 1}. ${t}`).join("\n")}
 2. altText (русский, описание для HTML alt атрибута, 10-15 слов)
 3. caption (русский, подпись под картинкой, 5-10 слов)
 
-Требования к промптам:
-- Профессиональный, современный стиль
+ВАЖНО — требования к промптам:
+- Формат ШИРОКИЙ ПАНОРАМНЫЙ баннер 8:1 (очень широкий и низкий)
+- Горизонтальная композиция с центральным объектом и размытыми краями
+- Профессиональный корпоративный стиль, мягкое освещение
 - Никакого текста внутри изображения
 - Никаких лиц людей крупным планом
 - Иллюстрирует концепцию раздела
-- Стиль: clean digital illustration, soft lighting
+- Стиль: wide panoramic banner, professional corporate photography style, shallow depth of field, soft background
 
 Верни JSON массив:
 [
@@ -88,7 +90,7 @@ ${h2Titles.map((t, i) => `${i + 1}. ${t}`).join("\n")}
     });
     return h2Titles.map((h2) => ({
       h2,
-      fluxPrompt: `Professional clean illustration representing: ${h2}, soft lighting, no text, no faces`,
+      fluxPrompt: `Wide panoramic banner, professional corporate style: ${h2}, horizontal composition, soft lighting, shallow depth of field, no text, no faces, 8:1 aspect ratio`,
       altText: h2,
       caption: h2,
     }));
@@ -130,8 +132,10 @@ export async function generateImages(
 }
 
 async function callFalAi(prompt: string): Promise<string> {
-  // Fal.ai is synchronous for fast models — no polling needed.
   const endpoint = `https://fal.run/${config.falAi.model}`;
+
+  // Use 1920x480 wide panoramic format — WordPress crops to 1920x240 for article banners
+  const imageSize = { width: 1920, height: 480 };
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -141,8 +145,8 @@ async function callFalAi(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       prompt,
-      image_size: config.falAi.imageSize,
-      num_inference_steps: 4, // flux-schnell optimal
+      image_size: imageSize,
+      num_inference_steps: 4,
       num_images: 1,
       enable_safety_checker: true,
     }),
