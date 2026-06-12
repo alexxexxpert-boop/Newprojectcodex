@@ -28,6 +28,51 @@ export interface UploadedImages {
   featuredMediaId: number | null;
 }
 
+// Upload a pre-built banner Buffer as the article's featured image
+export async function uploadBannerAsFeatureImage(
+  bannerBuffer: Buffer,
+  articleSlug: string,
+  altText: string
+): Promise<number | null> {
+  if (config.dryRun) return null;
+
+  try {
+    const uploadRes = await fetch(`${config.wordpress.apiUrl}/media`, {
+      method: "POST",
+      headers: {
+        Authorization: wpAuthHeader(),
+        "Content-Disposition": `attachment; filename="${articleSlug}-banner.jpg"`,
+        "Content-Type": "image/jpeg",
+      },
+      body: bannerBuffer,
+    });
+
+    if (!uploadRes.ok) {
+      const body = await uploadRes.text();
+      throw new Error(`WP banner upload error ${uploadRes.status}: ${body}`);
+    }
+
+    const data = (await uploadRes.json()) as WpMediaResponse;
+
+    await fetch(`${config.wordpress.apiUrl}/media/${data.id}`, {
+      method: "POST",
+      headers: {
+        Authorization: wpAuthHeader(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ alt_text: altText, title: altText }),
+    });
+
+    logger.info("Banner uploaded as featured image", { id: data.id, slug: articleSlug });
+    return data.id;
+  } catch (err) {
+    logger.warn("Failed to upload banner, will use first section image as fallback", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
 function wpAuthHeader(): string {
   const credentials = `${config.wordpress.username}:${config.wordpress.appPassword}`;
   return "Basic " + Buffer.from(credentials).toString("base64");

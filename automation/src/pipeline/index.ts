@@ -6,7 +6,8 @@ import { writeSections } from "./writer.js";
 import { generateImagePrompts, generateImages } from "./images.js";
 import { auditContent } from "./auditor.js";
 import { compileArticle } from "./compiler.js";
-import { publishToWordPress, uploadImagesToWordPress } from "./publisher.js";
+import { publishToWordPress, uploadImagesToWordPress, uploadBannerAsFeatureImage } from "./publisher.js";
+import { createBannerFromMedia } from "./banner.js";
 import type { PublishResult } from "./publisher.js";
 import type { CompiledArticle } from "./compiler.js";
 
@@ -38,8 +39,20 @@ export async function runPipeline(keyword: string): Promise<PipelineResult> {
   // Step 6: Generate images via Fal.ai (optional)
   const rawImages = await generateImages(imagePrompts);
 
-  // Step 6b: Upload images to WP media library (no external CDN links in articles)
-  const { images, featuredMediaId } = await uploadImagesToWordPress(rawImages, outline.slug);
+  // Step 6b: Upload section images to WP media library
+  const { images, featuredMediaId: firstSectionImageId } = await uploadImagesToWordPress(rawImages, outline.slug);
+
+  // Step 6c: Build featured banner (1920×480) from existing site photos
+  let featuredMediaId = firstSectionImageId;
+  try {
+    const bannerBuffer = await createBannerFromMedia();
+    const bannerId = await uploadBannerAsFeatureImage(bannerBuffer, outline.slug, outline.h1);
+    if (bannerId) featuredMediaId = bannerId;
+  } catch (err) {
+    logger.warn("Banner creation failed, using first section image as featured", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   // Step 7: Compile full article
   const article = compileArticle(outline, writtenSections, images);
@@ -52,7 +65,7 @@ export async function runPipeline(keyword: string): Promise<PipelineResult> {
     approved: auditResult.approved,
   });
 
-  // Step 9: Publish to WordPress with featured image
+  // Step 9: Publish to WordPress with featured banner
   const publishResult = await publishToWordPress(article, featuredMediaId);
 
   logger.info("Pipeline complete", {
