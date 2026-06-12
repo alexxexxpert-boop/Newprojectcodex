@@ -5,7 +5,7 @@ import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 
 const BANNER_WIDTH = 1920;
-const BANNER_HEIGHT = 480;
+const BANNER_HEIGHT = 240;
 const USED_IDS_FILE = path.resolve(process.cwd(), "queue/banner-used.json");
 
 interface WpMedia {
