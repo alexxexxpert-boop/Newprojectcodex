@@ -75,6 +75,10 @@ export const config = {
     revalidateSecret: optional("NEXTJS_REVALIDATE_SECRET"),
   },
   llm: buildLlmConfig(),
+  tavily: {
+    apiKey: optional("TAVILY_API_KEY"),
+    enabled: !!process.env["TAVILY_API_KEY"],
+  },
   perplexity: {
     apiKey: optional("PERPLEXITY_API_KEY"),
     enabled: !!process.env["PERPLEXITY_API_KEY"],

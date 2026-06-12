@@ -97,6 +97,10 @@ if [ "$NEED_ENV" = "1" ]; then
   echo "── OpenRouter (openrouter.ai → Keys) ──"
   ask "OpenRouter API ключ (sk-or-...): " OR_KEY
   echo ""
+  echo "── Tavily (БЕСПЛАТНЫЙ поиск, 1000/мес) — НЕОБЯЗАТЕЛЬНО (Enter пропустить) ──"
+  echo "   Ключ: https://app.tavily.com → API Keys"
+  ask "Tavily API ключ (tvly-... или Enter): " TAVILY_KEY
+  echo ""
   echo "── Fal.ai для картинок — НЕОБЯЗАТЕЛЬНО (Enter чтобы пропустить) ──"
   ask "Fal.ai ключ (или Enter): " FAL_KEY
 
@@ -112,6 +116,7 @@ OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
 OPENROUTER_REFERER=https://presswall-presswall.ru
 OPENROUTER_TITLE=PressWall SEO
 
+TAVILY_API_KEY=${TAVILY_KEY}
 FAL_AI_KEY=${FAL_KEY}
 FAL_AI_MODEL=fal-ai/flux/schnell
 FAL_AI_IMAGE_SIZE=landscape_16_9

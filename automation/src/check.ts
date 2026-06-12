@@ -67,8 +67,9 @@ function checkOptional(): void {
   if (config.falAi.enabled) ok("Fal.ai настроен — картинки будут генерироваться");
   else skip("Fal.ai не настроен — статьи без картинок (это ок)");
 
-  if (config.perplexity.enabled) ok("Perplexity настроен — research включён");
-  else skip("Perplexity не настроен — разделы без внешнего research (это ок)");
+  if (config.tavily.enabled) ok("Tavily настроен — research включён (бесплатно 1000/мес)");
+  else if (config.perplexity.enabled) ok("Perplexity настроен — research включён");
+  else skip("Research не настроен — статьи без внешних данных (это ок). Tavily бесплатно: tavily.com");
 
   if (config.semrush.enabled) ok("Semrush настроен");
   else skip("Semrush не настроен — только seed keyword (это ок)");
