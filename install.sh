@@ -17,6 +17,16 @@ INSTALL_DIR="$HOME/kyber-seo"
 bold() { printf "\033[1m%s\033[0m\n" "$*"; }
 step() { printf "\n\033[1;34m▶ %s\033[0m\n" "$*"; }
 
+# При запуске через `curl | bash` stdin занят самим скриптом,
+# поэтому все вопросы читаем напрямую с терминала (/dev/tty).
+if [ ! -r /dev/tty ]; then
+  echo "❌ Нет доступа к терминалу для ввода ключей."
+  echo "   Скачай и запусти скрипт в два шага:"
+  echo "   curl -fsSL <url>/install.sh -o install.sh && bash install.sh"
+  exit 1
+fi
+ask() { read -r -p "$1" "$2" < /dev/tty; }
+
 bold "═══════════════════════════════════════════"
 bold " Кибер СЕО & GEO — автоустановка"
 bold "═══════════════════════════════════════════"
@@ -64,21 +74,31 @@ npm install --no-audit --no-fund --loglevel=error
 echo "  ✅ Зависимости установлены"
 
 # ─── 5. Ключи → .env ─────────────────────────────────────────────────
+NEED_ENV=1
 if [ -f .env ]; then
-  step ".env уже существует — оставляю как есть"
-else
+  step "Найден существующий .env"
+  ask "Оставить его? (y = оставить / n = настроить заново): " KEEP_ENV
+  if [ "${KEEP_ENV,,}" = "y" ]; then
+    NEED_ENV=0
+    echo "  ✅ Оставляю текущий .env"
+  else
+    rm -f .env
+  fi
+fi
+
+if [ "$NEED_ENV" = "1" ]; then
   step "Настройка ключей (вставляй и жми Enter)"
   echo ""
   echo "── WordPress (presswall-presswall.ru) ──"
-  read -r -p "Логин админки WordPress: " WP_USER
+  ask "Логин админки WordPress: " WP_USER
   echo "Application Password (создаётся: Пользователи → профиль → Пароли приложений)"
-  read -r -p "Application Password (формат: xxxx xxxx xxxx ...): " WP_PASS
+  ask "Application Password (формат: xxxx xxxx xxxx ...): " WP_PASS
   echo ""
   echo "── OpenRouter (openrouter.ai → Keys) ──"
-  read -r -p "OpenRouter API ключ (sk-or-...): " OR_KEY
+  ask "OpenRouter API ключ (sk-or-...): " OR_KEY
   echo ""
   echo "── Fal.ai для картинок — НЕОБЯЗАТЕЛЬНО (Enter чтобы пропустить) ──"
-  read -r -p "Fal.ai ключ (или Enter): " FAL_KEY
+  ask "Fal.ai ключ (или Enter): " FAL_KEY
 
   cat > .env <<ENVEOF
 # Сгенерировано install.sh $(date +%Y-%m-%d)
