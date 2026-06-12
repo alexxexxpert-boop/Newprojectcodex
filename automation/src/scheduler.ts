@@ -26,7 +26,7 @@ export function startScheduler(): void {
   });
 }
 
-async function processQueue(): Promise<void> {
+export async function processQueue(): Promise<void> {
   if (isRunning) {
     logger.info("Previous run still in progress, skipping this poll");
     return;

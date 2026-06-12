@@ -5,6 +5,8 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "tsx src/index.ts",
+    "once": "tsx src/once.ts",
+    "check": "tsx src/check.ts",
     "dry-run": "tsx src/dry-run.ts",
     "build": "tsc --outDir dist",
     "start:prod": "node dist/index.js",
