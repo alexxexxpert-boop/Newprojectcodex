@@ -8,6 +8,7 @@ import { auditContent } from "./auditor.js";
 import { compileArticle } from "./compiler.js";
 import { publishToWordPress, uploadImagesToWordPress, uploadBannerAsFeatureImage } from "./publisher.js";
 import { createBannerFromMedia } from "./banner.js";
+import { buildInternalLinksBlock } from "./linker.js";
 import type { PublishResult } from "./publisher.js";
 import type { CompiledArticle } from "./compiler.js";
 
@@ -56,6 +57,21 @@ export async function runPipeline(keyword: string): Promise<PipelineResult> {
 
   // Step 7: Compile full article
   const article = compileArticle(outline, writtenSections, images);
+
+  // Step 7b: Inject internal links to previously published articles
+  const internalLinksBlock = await buildInternalLinksBlock(keyword);
+  if (internalLinksBlock) {
+    // Insert before conclusion (<h2>Заключение</h2>) if present, else append
+    const conclusionIdx = article.content.indexOf("<h2>Заключение</h2>");
+    if (conclusionIdx !== -1) {
+      article.content =
+        article.content.slice(0, conclusionIdx) +
+        internalLinksBlock + "\n" +
+        article.content.slice(conclusionIdx);
+    } else {
+      article.content += "\n" + internalLinksBlock;
+    }
+  }
 
   // Step 8: Audit content quality
   const auditResult = await auditContent(keyword, article.content);

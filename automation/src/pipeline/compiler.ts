@@ -1,6 +1,7 @@
 import type { ArticleOutline } from "./planner.js";
 import type { WrittenSection } from "./writer.js";
 import type { GeneratedImage } from "./images.js";
+import { config } from "../config.js";
 
 export interface CompiledArticle {
   title: string;
@@ -82,6 +83,19 @@ export function compileArticle(
     parts.push(`<div class="cta-block"><p><strong>${escapeHtml(outline.cta)}</strong></p></div>`);
   }
 
+  // Author box (if configured)
+  if (config.author.name) {
+    const avatar = config.author.avatarUrl
+      ? `<img src="${escapeHtml(config.author.avatarUrl)}" alt="${escapeHtml(config.author.name)}" class="author-avatar" />`
+      : "";
+    const bio = config.author.bio
+      ? `<p class="author-bio">${escapeHtml(config.author.bio)}</p>`
+      : "";
+    parts.push(
+      `<div class="author-box">${avatar}<div class="author-info"><strong class="author-name">${escapeHtml(config.author.name)}</strong>${bio}</div></div>`
+    );
+  }
+
   const content = parts.join("\n");
   const wordCount = content.replace(/<[^>]+>/g, " ").split(/\s+/).length;
 
@@ -96,7 +110,7 @@ export function compileArticle(
     excerpt: outline.intro,
     slug: outline.slug,
     metaDescription: outline.metaDescription,
-    categories: ["Блог"],
+    categories: [config.automation.defaultCategory],
     tags,
     wordCount,
   };

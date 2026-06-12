@@ -112,6 +112,12 @@ export const config = {
   automation: {
     publishStatus: (optional("PUBLISH_STATUS", "draft") as "publish" | "draft"),
     pollIntervalMinutes: parseInt(optional("POLL_INTERVAL_MINUTES", "5"), 10),
+    defaultCategory: optional("DEFAULT_CATEGORY", "Блог"),
+  },
+  author: {
+    name: optional("AUTHOR_NAME"),
+    bio: optional("AUTHOR_BIO"),
+    avatarUrl: optional("AUTHOR_AVATAR_URL"),
   },
   dryRun: DRY_RUN,
 };

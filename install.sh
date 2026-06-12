@@ -103,6 +103,11 @@ if [ "$NEED_ENV" = "1" ]; then
   echo ""
   echo "── Fal.ai для картинок — НЕОБЯЗАТЕЛЬНО (Enter чтобы пропустить) ──"
   ask "Fal.ai ключ (или Enter): " FAL_KEY
+  echo ""
+  echo "── Автор статей — НЕОБЯЗАТЕЛЬНО (Enter пропустить) ──"
+  ask "Имя автора (например: Команда PressWall, или Enter): " AUTHOR_NAME
+  ask "Краткое био автора (или Enter): " AUTHOR_BIO
+  ask "URL аватара автора (или Enter): " AUTHOR_AVATAR
 
   cat > .env <<ENVEOF
 # Сгенерировано install.sh $(date +%Y-%m-%d)
@@ -127,6 +132,11 @@ SEMRUSH_API_KEY=
 QUEUE_MODE=file
 PUBLISH_STATUS=draft
 POLL_INTERVAL_MINUTES=5
+DEFAULT_CATEGORY=Статьи
+
+AUTHOR_NAME=${AUTHOR_NAME}
+AUTHOR_BIO=${AUTHOR_BIO}
+AUTHOR_AVATAR_URL=${AUTHOR_AVATAR}
 
 NEXT_PUBLIC_SITE_URL=https://presswall-presswall.ru
 NEXTJS_REVALIDATE_SECRET=
