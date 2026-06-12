@@ -46,7 +46,13 @@ export async function uploadImagesToWordPress(
     idx++;
     try {
       const wpUrl = await withRetry(() =>
-        uploadSingleImage(img.imageUrl, `${articleSlug}-${idx}.jpg`)
+        uploadSingleImage(
+          img.imageUrl,
+          `${articleSlug}-${idx}.jpg`,
+          img.altText,
+          img.altText,   // title = altText (краткое SEO-название)
+          img.caption
+        )
       );
       result.push({ ...img, imageUrl: wpUrl });
       logger.info("Image uploaded to WP media library", { h2: img.h2, wpUrl });
@@ -64,7 +70,10 @@ export async function uploadImagesToWordPress(
 
 async function uploadSingleImage(
   externalUrl: string,
-  filename: string
+  filename: string,
+  altText: string,
+  title: string,
+  caption: string
 ): Promise<string> {
   const downloadRes = await fetch(externalUrl);
   if (!downloadRes.ok) {
@@ -89,7 +98,22 @@ async function uploadSingleImage(
     throw new Error(`WP media upload error ${uploadRes.status}: ${body}`);
   }
 
-  const data = (await uploadRes.json()) as WpMediaResponse;
+  const data = (await uploadRes.json()) as WpMediaResponse & { id: number };
+
+  // Set SEO metadata in the media library
+  await fetch(`${config.wordpress.apiUrl}/media/${data.id}`, {
+    method: "POST",
+    headers: {
+      Authorization: wpAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      alt_text: altText,
+      title: title,
+      caption: caption,
+    }),
+  });
+
   return data.source_url;
 }
 
