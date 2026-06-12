@@ -17,6 +17,18 @@ function optional(key: string, fallback = ""): string {
   return process.env[key] ?? fallback;
 }
 
+// Queue mode: "file" reads keywords from a local text file (no Google Cloud
+// setup needed); "sheets" uses Google Sheets. Defaults to "sheets" when
+// GOOGLE_SHEETS_ID is set, otherwise "file".
+const queueMode = (optional(
+  "QUEUE_MODE",
+  process.env["GOOGLE_SHEETS_ID"] ? "sheets" : "file"
+) as "sheets" | "file");
+
+function requiredForSheets(key: string): string {
+  return queueMode === "sheets" ? required(key) : optional(key);
+}
+
 export type LlmProvider = "anthropic" | "openrouter";
 
 export interface LlmConfig {
@@ -78,10 +90,15 @@ export const config = {
     apiKey: optional("SEMRUSH_API_KEY"),
     enabled: !!process.env["SEMRUSH_API_KEY"],
   },
+  queue: {
+    mode: queueMode,
+    // Path to the keywords file (relative to automation/), used in file mode
+    file: optional("QUEUE_FILE", "queue/keywords.txt"),
+  },
   googleSheets: {
-    spreadsheetId: required("GOOGLE_SHEETS_ID"),
-    serviceAccountEmail: required("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
-    privateKey: required("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(
+    spreadsheetId: requiredForSheets("GOOGLE_SHEETS_ID"),
+    serviceAccountEmail: requiredForSheets("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
+    privateKey: requiredForSheets("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(
       /\\n/g,
       "\n"
     ),

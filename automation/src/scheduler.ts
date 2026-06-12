@@ -2,6 +2,12 @@ import cron from "node-cron";
 import { config } from "./config.js";
 import { logger } from "./utils/logger.js";
 import { getQueuedKeywords, updateStatus, addPublishedRecord } from "./sheets.js";
+import {
+  getQueuedKeywordsFromFile,
+  removeKeywordFromFile,
+  markKeywordErrorInFile,
+  appendPublishedCsv,
+} from "./queue/file.js";
 import { runPipeline } from "./pipeline/index.js";
 
 let isRunning = false;
@@ -27,9 +33,14 @@ async function processQueue(): Promise<void> {
   }
 
   isRunning = true;
-  logger.info("Polling Google Sheets queue...");
+  logger.info(`Polling ${config.queue.mode} queue...`);
 
   try {
+    if (config.queue.mode === "file") {
+      await processFileQueue();
+      return;
+    }
+
     const queued = await getQueuedKeywords();
 
     if (queued.length === 0) {
@@ -51,6 +62,51 @@ async function processQueue(): Promise<void> {
     });
   } finally {
     isRunning = false;
+  }
+}
+
+async function processFileQueue(): Promise<void> {
+  const keywords = await getQueuedKeywordsFromFile();
+
+  if (keywords.length === 0) {
+    logger.info("Queue file is empty, nothing to process", {
+      file: config.queue.file,
+    });
+    return;
+  }
+
+  logger.info(`Found ${keywords.length} keyword(s) in queue file`, { keywords });
+
+  for (const keyword of keywords) {
+    try {
+      const result = await runPipeline(keyword);
+
+      await removeKeywordFromFile(keyword);
+      await appendPublishedCsv({
+        keyword,
+        articleUrl: result.publishResult.url,
+        publishDate: new Date().toISOString().split("T")[0] ?? "",
+        seoScore: result.auditScore,
+        wordCount: result.article.wordCount,
+      });
+
+      logger.info("Keyword processed successfully", {
+        keyword,
+        url: result.publishResult.url,
+      });
+    } catch (err) {
+      logger.error("Failed to process keyword", {
+        keyword,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      try {
+        await markKeywordErrorInFile(keyword);
+      } catch (fileErr) {
+        logger.error("Failed to mark error in queue file", {
+          error: fileErr instanceof Error ? fileErr.message : String(fileErr),
+        });
+      }
+    }
   }
 }
 

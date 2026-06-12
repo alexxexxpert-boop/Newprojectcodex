@@ -3,6 +3,7 @@ import { logger } from "./utils/logger.js";
 import { startScheduler } from "./scheduler.js";
 
 logger.info("Кибер СЕО & GEO Automation Service starting...", {
+  queueMode: config.queue.mode,
   publishStatus: config.automation.publishStatus,
   pollInterval: config.automation.pollIntervalMinutes,
   perplexityEnabled: config.perplexity.enabled,
