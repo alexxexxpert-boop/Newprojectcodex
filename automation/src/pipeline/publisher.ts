@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 import { withRetry } from "../utils/retry.js";
 import type { CompiledArticle } from "./compiler.js";
+import type { GeneratedImage } from "./images.js";
 
 export interface PublishResult {
   id: number;
@@ -17,9 +18,79 @@ interface WpPostResponse {
   slug: string;
 }
 
+interface WpMediaResponse {
+  source_url: string;
+}
+
 function wpAuthHeader(): string {
   const credentials = `${config.wordpress.username}:${config.wordpress.appPassword}`;
   return "Basic " + Buffer.from(credentials).toString("base64");
+}
+
+// Download images from external CDN and upload to WordPress media library.
+// This ensures no external image URLs end up in published articles.
+export async function uploadImagesToWordPress(
+  images: GeneratedImage[],
+  articleSlug: string
+): Promise<GeneratedImage[]> {
+  if (config.dryRun) return images;
+
+  const result: GeneratedImage[] = [];
+  let idx = 0;
+
+  for (const img of images) {
+    if (!img.imageUrl) {
+      result.push(img);
+      continue;
+    }
+    idx++;
+    try {
+      const wpUrl = await withRetry(() =>
+        uploadSingleImage(img.imageUrl, `${articleSlug}-${idx}.jpg`)
+      );
+      result.push({ ...img, imageUrl: wpUrl });
+      logger.info("Image uploaded to WP media library", { h2: img.h2, wpUrl });
+    } catch (err) {
+      logger.warn("Failed to upload image to WordPress, omitting image", {
+        h2: img.h2,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      result.push({ ...img, imageUrl: "" });
+    }
+  }
+
+  return result;
+}
+
+async function uploadSingleImage(
+  externalUrl: string,
+  filename: string
+): Promise<string> {
+  const downloadRes = await fetch(externalUrl);
+  if (!downloadRes.ok) {
+    throw new Error(`Failed to download image: ${downloadRes.status}`);
+  }
+
+  const imageBuffer = await downloadRes.arrayBuffer();
+  const contentType = downloadRes.headers.get("content-type") ?? "image/jpeg";
+
+  const uploadRes = await fetch(`${config.wordpress.apiUrl}/media`, {
+    method: "POST",
+    headers: {
+      Authorization: wpAuthHeader(),
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Type": contentType,
+    },
+    body: imageBuffer,
+  });
+
+  if (!uploadRes.ok) {
+    const body = await uploadRes.text();
+    throw new Error(`WP media upload error ${uploadRes.status}: ${body}`);
+  }
+
+  const data = (await uploadRes.json()) as WpMediaResponse;
+  return data.source_url;
 }
 
 export async function publishToWordPress(
@@ -31,7 +102,6 @@ export async function publishToWordPress(
 
   logger.info("Publishing to WordPress", { slug: article.slug });
 
-  // Resolve category IDs (create if missing)
   const categoryIds = await ensureCategories(article.categories);
   const tagIds = await ensureTags(article.tags);
 
@@ -69,7 +139,6 @@ export async function publishToWordPress(
 
   logger.info("Published to WordPress", { id: result.id, url: result.link });
 
-  // Trigger Next.js ISR revalidation (non-critical, don't fail if this errors)
   if (config.nextjs.revalidateSecret) {
     await triggerRevalidation(article.slug).catch((err) => {
       logger.warn("ISR revalidation failed (non-critical)", {
@@ -137,10 +206,7 @@ async function getOrCreateTerm(
 }
 
 async function triggerRevalidation(slug: string): Promise<void> {
-  const revalidateUrl = new URL(
-    `/api/revalidate`,
-    config.nextjs.siteUrl
-  );
+  const revalidateUrl = new URL(`/api/revalidate`, config.nextjs.siteUrl);
   revalidateUrl.searchParams.set("secret", config.nextjs.revalidateSecret);
   revalidateUrl.searchParams.set("slug", slug);
 
@@ -151,8 +217,6 @@ async function triggerRevalidation(slug: string): Promise<void> {
   logger.info("ISR revalidation triggered", { slug });
 }
 
-// DRY_RUN: write the compiled article to disk as a standalone HTML preview
-// instead of publishing to WordPress.
 async function publishToDisk(article: CompiledArticle): Promise<PublishResult> {
   const outputDir = path.resolve(process.cwd(), "output");
   await mkdir(outputDir, { recursive: true });

@@ -6,7 +6,7 @@ import { writeSections } from "./writer.js";
 import { generateImagePrompts, generateImages } from "./images.js";
 import { auditContent } from "./auditor.js";
 import { compileArticle } from "./compiler.js";
-import { publishToWordPress } from "./publisher.js";
+import { publishToWordPress, uploadImagesToWordPress } from "./publisher.js";
 import type { PublishResult } from "./publisher.js";
 import type { CompiledArticle } from "./compiler.js";
 
@@ -35,8 +35,11 @@ export async function runPipeline(keyword: string): Promise<PipelineResult> {
   const h2Titles = outline.sections.map((s) => s.h2);
   const imagePrompts = await generateImagePrompts(keyword, h2Titles);
 
-  // Step 6: Generate images (optional)
-  const images = await generateImages(imagePrompts);
+  // Step 6: Generate images via Fal.ai (optional)
+  const rawImages = await generateImages(imagePrompts);
+
+  // Step 6b: Upload images to WP media library (no external CDN links in articles)
+  const images = await uploadImagesToWordPress(rawImages, outline.slug);
 
   // Step 7: Compile full article
   const article = compileArticle(outline, writtenSections, images);
