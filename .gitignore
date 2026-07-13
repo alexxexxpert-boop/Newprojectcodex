@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+nextjs/.next/
+nextjs/out/
+
+# Production builds
+dist/
+nextjs/dist/
+
+# Environment files — NEVER commit real secrets
+.env
+.env.local
+.env.production
+.env.*.local
+# Allow example files
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Dry-run output
+automation/output/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# TypeScript
+*.tsbuildinfo
+
+# Queue data (file mode)
+automation/queue/

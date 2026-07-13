@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply text-gray-900 bg-white;
+  }
+}
+
+@layer components {
+  .faq dt {
+    @apply font-semibold text-gray-900 mt-4;
+  }
+  .faq dd {
+    @apply text-gray-600 mt-1 ml-4;
+  }
+
+  .cta-block {
+    @apply bg-brand-50 border border-brand-500 rounded-lg p-6 my-8 text-center;
+  }
+}
