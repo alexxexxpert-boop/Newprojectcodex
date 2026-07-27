@@ -1,0 +1,1 @@
+"""Avito Presswall AI service."""
