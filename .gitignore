@@ -8,3 +8,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+node_modules/
+*.log
+frontend/implementation-initial.png
+frontend/implementation-initial-v2.png

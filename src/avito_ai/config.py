@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
     crawl_timeout_seconds: float = Field(default=20, gt=0, le=60)
-    max_catalog_items: int = Field(default=50, gt=0, le=500)
+    max_catalog_items: int = Field(default=12, gt=0, le=500)
 
 
 @lru_cache
