@@ -17,6 +17,8 @@ class CatalogItemResponse(BaseModel):
     source_url: str
     description: str
     price_rub: int | None
+    image_urls: tuple[str, ...]
+    category: str
 
 
 class DraftResponse(BaseModel):
@@ -25,6 +27,10 @@ class DraftResponse(BaseModel):
     title: str
     description: str
     market: str
+    keywords: tuple[str, ...]
+    image_urls: tuple[str, ...]
+    source_url: str
+    alternate_titles: tuple[str, ...]
 
 
 class WorkflowResponse(BaseModel):

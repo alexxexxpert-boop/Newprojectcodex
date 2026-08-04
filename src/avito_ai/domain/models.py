@@ -17,6 +17,8 @@ class CatalogItem:
     source_url: str
     description: str = ""
     price_rub: int | None = None
+    image_urls: tuple[str, ...] = ()
+    category: str = "Товары и услуги"
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -31,6 +33,10 @@ class ListingDraft:
     title: str
     description: str
     market: str
+    keywords: tuple[str, ...] = ()
+    image_urls: tuple[str, ...] = ()
+    source_url: str = ""
+    alternate_titles: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)

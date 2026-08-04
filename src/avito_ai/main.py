@@ -1,9 +1,12 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from avito_ai.agents.catalog import HttpCatalogAgent
 from avito_ai.agents.copywriter import TemplateCopyAgent
@@ -25,6 +28,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Avito Presswall AI", version="0.1.0", lifespan=lifespan)
+frontend_dir = Path(__file__).resolve().parents[2] / "frontend" / "dist" / "client"
+
+if frontend_dir.exists():
+    app.mount("/assets", StaticFiles(directory=frontend_dir / "assets"), name="frontend-assets")
 
 
 def get_orchestrator(request: Request) -> WorkflowOrchestrator:
@@ -34,6 +41,13 @@ def get_orchestrator(request: Request) -> WorkflowOrchestrator:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/", include_in_schema=False)
+async def frontend() -> FileResponse:
+    if not frontend_dir.exists():
+        raise HTTPException(status_code=503, detail="Frontend has not been built")
+    return FileResponse(frontend_dir / "index.html")
 
 
 @app.post("/v1/workflows", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
